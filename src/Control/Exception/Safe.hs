@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ImplicitParams #-}
 -- | Please see the README.md file in the safe-exceptions repo for
 -- information on how to use this module. Relevant links:
 --
@@ -13,6 +14,7 @@ module Control.Exception.Safe
       throw
     , throwIO
     , throwM
+    , throwString
     , throwTo
     , impureThrow
       -- * Catching (with recovery)
@@ -91,6 +93,11 @@ import Control.Monad (liftM)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Typeable (Typeable, cast)
 
+#if MIN_VERSION_base(4,9,0)
+import GHC.Exception (errorCallWithCallStackException)
+import GHC.Stack.Types (HasCallStack)
+#endif
+
 -- | Synchronously throw the given exception
 --
 -- @since 0.1.0.0
@@ -108,6 +115,17 @@ throwIO = throw
 -- @since 0.1.0.0
 throwM :: (C.MonadThrow m, Exception e) => e -> m a
 throwM = throw
+
+-- | A convenience function for throwing a user error. This is useful
+-- for cases where it would be too high a burden to define your own
+-- exception type.
+#if MIN_VERSION_base(4,9,0)
+throwString :: (C.MonadThrow m, HasCallStack) => String -> m a
+throwString s = throwM (errorCallWithCallStackException s ?callStack)
+#else
+throwString :: C.MonadThrow m => String -> m a
+throwString = throwM . userError
+#endif
 
 -- | Throw an asynchronous exception to another thread.
 --

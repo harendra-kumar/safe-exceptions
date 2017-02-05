@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Control.Exception.SafeSpec (spec) where
@@ -12,6 +13,9 @@ import Data.Void (Void, absurd)
 import System.IO.Unsafe (unsafePerformIO)
 import System.Timeout (timeout)
 import Test.Hspec
+#if !MIN_VERSION_base(4,9,0)
+import System.IO.Error (isUserError)
+#endif
 
 newtype ExceptionPred = ExceptionPred { getExceptionPred :: Maybe () } deriving (Show, Eq, Typeable)
 
@@ -124,3 +128,15 @@ spec = do
         let ex = ExceptionPred Nothing
         res <- try (catchJust getExceptionPred (throw ex) (return . Just))
         res `shouldBe` Left ex
+
+    describe "throwString" $ do
+#if MIN_VERSION_base(4,9,0)
+      it "is an ErrorCall" $
+        throwString "foo" `catch` \(E.ErrorCall _) -> return () :: IO ()
+#else
+      it "is a UserError" $
+        throwString "foo" `catch` \e ->
+          if isUserError e
+            then return () :: IO ()
+            else throwIO e
+#endif
